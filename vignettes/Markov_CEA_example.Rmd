@@ -46,13 +46,16 @@ The R package `dampack` has a couple functions that could be used to evaluate Ma
 
 # Model Description
 
-We will develop a 4-state Markov model to quantify the expected outcomes for a cohort of 55-year-old women who have undergone tumor excision for localized breast cancer (BCA).  After surgery, all patients are initially tumor-free (i.e., will start in the "Local" Markov state). Each year, patients in the Local state face a 2% chance that they will experience a recurrence.  Of these recurrences, 75% will present as metastatic disease (and patients will enter the "Mets"" Markov state), and the remainder present as local disease (and patients will enter the "Recur"" Markov state).  Patients in the Recur state undergo repeat resection.  Following this operation, they face a 6% chance of recurrence each year.  (Assume that all local recurrences - 1st, 2nd, 3rd, etc. - have equivalent prognoses.)  Of these recurrences, 90% will present as metastatic disease.  Only patients with metastatic disease can die of breast cancer.  Finally, all patients in the local and recur state face a 7.6% annual probability of mortality and patients in the mets state face a 39% added risk of death. The state-transition diagram of this 4-state Markov model is shown in Figure \@ref(fig:state-transition-diag).
+We will develop a 4-state Markov model to quantify the expected outcomes (costs and QALYs) for a cohort of 55-year-old women who have undergone tumor excision for localized breast cancer (BCA).  After surgery, all patients are initially tumor-free (i.e., will start in the "Local" Markov state). Each year, patients in the Local state face a 2% chance that they will experience a recurrence.  Of these recurrences, 75% will present as metastatic disease (and patients will enter the "Mets" Markov state), and the remainder present as local disease (and patients will enter the "Recur" Markov state).  Patients in the Recur state undergo repeat resection.  Following this operation, they face a 6% chance of recurrence each year. (Assume that all local recurrences - 1st, 2nd, 3rd, etc. - have equivalent prognoses.)  Of these recurrences, 90% will present as metastatic disease.  Only patients with metastatic disease can die of breast cancer. Finally, all patients in the local and recur state face a 0.08 annual rate of dying from non-BCA-related causes and patients in the mets state face a  0.5 anual rate of of dying of metastatic cancer in addition to dying from other causes.The state-transition diagram of this 4-state Markov model is shown in Figure \@ref(fig:state-transition-diag).
 
 ```{r state-transition-diag, echo=FALSE, fig.cap="State-transition diagram of a 4-state Markov model of breast cancer.", fig.pos="H"}
 knitr::include_graphics("figs/Markov-Diagram-BRCA.pdf") 
 ```
 
-The Markov model described above represents usual care for women with breast cancer. Once we construct that Markov model, we will then add a second strategy of a hypothetical new treatment. The effect of this new treatment is to reduce the initial rate of cancer recurrence by 50%; however, the treatment also lowers the quality of life of women (disutility of 0.05) taking the medication because of side effects. Treatment is only taken by women who have not experienced a recurrence (i.e., those who reside in the Local state).  The Markov model for the treatment strategy will be structurally identical to that of the usual care strategy.
+```{r state-transition-diag, echo=FALSE, fig.cap="State-transition diagram of a 4-state Markov model of breast cancer.", fig.pos="H"}
+knitr::include_graphics("figs/Markov-model-BRCA.png") 
+```
+The Markov model described above represents usual care for women with breast cancer. Once we construct that Markov model, we will then add a second strategy of a hypothetical new treatment. The effect of this new treatment is to reduce the initial rate of cancer recurrence by 50%; however, the treatment also lowers the quality of life of women (disutility of 0.05) taking the medication because of side effects. Treatment is only taken by women who have not experienced a recurrence (i.e., those who reside in the Local state). The Markov model for the treatment strategy will be structurally identical to that of the usual care strategy.
 
 After comparing the two strategies based on quality-adjusted life expectancy (QALE) and costs, we will incorporate costs and calculate the incremental cost per quality-adjusted life year (QALY) gained of treatment compared with usual care.
 
@@ -70,14 +73,14 @@ n.s <- length(state.names)
 
 From the decision problem, we know that patients in the local state face a 2% chance of recurrence under usual care (defined as `p.BCA1`). Of these recurrences, 75% will present as metastatic disease (and patients will enter the “Mets” Markov state; defined as `p.Mets1`), and the remainder present as local disease (and patients will enter the “Recur” Markov state; i.e., `1-p.Mets1`). We will create variables to represent these probabilities of the transition matrix. Patients in the recur state face a 6% chance of recurrence each year (defined as `p.BCA2`). Of these recurrences, 90% will present as metastatic disease (defined as `p.Mets2`). 
 
-All patients in the local and recur state face a 0.076 annual rate of dying from non-BCA-related causes, $\mu_{Die}$ (defined as `mu.Die`). Patients in the Mets state face a 0.5 anual rate of of dying of metastatic cancer in addition to dying from other causes, $\mu_{DieMets}$ (defined as `mu.DieMets`). 
+All patients in the local and recur state face a 0.08 annual rate of dying from non-BCA-related causes, $\mu_{Die}$ (defined as `mu.Die`). Patients in the Mets state face a 0.5 anual rate of of dying of metastatic cancer in addition to dying from other causes, $\mu_{DieMets}$ (defined as `mu.DieMets`). 
 
 To compute the annual probability of dying from non-BCA-related causes (defined as `p.Die`) we transform the annual rate assuming constant exponential rate
 $$
   p_{Die} = 1-exp(-\mu_{Die})
 $$
 
-The overall annual mortality rate for women with metastatic disease is equal to the sum of the rates of dying from other causes and the excess disease-specific mortality rate (defined as muMets). Therefore, the annual probability of dying in the Mets state (defined as `p.DieMets`) is converted by summing these rates and convert them to annual probabilities
+The overall annual mortality rate for women with metastatic disease is equal to the sum of the rates of dying from other causes and the excess disease-specific mortality rate (defined as `muDieMets`). Therefore, the annual probability of dying in the Mets state (defined as `p.DieMets`) is converted by summing these rates and convert them to annual probabilities.
 
 $$
   p_{DieMets} = 1-exp(-(\mu_{Die}+\mu_{DieMets}))
@@ -105,10 +108,11 @@ Table: (\#tab:param-table) Table of parameters.
 | - All-cause mortality rate         | `mu.Die`    |  0.08 or age-specific |
 | - Cancer specific mortality rate   | `mu.DieMets`|  0.5          |
 | Annual costs                       |             |               |
-| - Cost of new treatment            |  `c.Rx`     |  1000         |
-| - Local state                      |  `c.Local`  |  500          |
-| - Recur state                      |  `c.Recur`  |  5000        |
-| - Mets state                       |  `c.Mets`   |  20000        |
+| - Cost of new treatment            | `c.Rx`      |  1000         |
+| - Local state                      | `c.Local`   |  500          |
+| - Recur state                      | `c.Recur`   |  5000         |
+| - Mets state                       | `c.Mets`    |  20000        |
+| - Dead state                       | `c.Dead`    |  0            |
 | Utilities                          |             |               |
 | - Local state under usual care     | `u.Local`   |  0.95         |
 | - Recur state                      | `u.Recur`   |  0.80         |
@@ -136,6 +140,7 @@ c.Local    <- 500
 c.Recur    <- 5000
 c.Mets     <- 20000
 c.Rx       <- 1000
+c.Dead     <- 0
 ```
 
 ## Transition matrix
@@ -161,7 +166,7 @@ m.P.UC["Local", "Dead"]  <- p.Die
 # From Recur
 m.P.UC["Recur", "Local"] <- 0
 m.P.UC["Recur", "Recur"] <- (1 - p.Die) * ((1 - p.BCA2) + (p.BCA2 * (1 - p.Mets2)))
-m.P.UC["Recur", "Mets"]  <- (1-p.Die)*p.BCA2*p.Mets2
+m.P.UC["Recur", "Mets"]  <- (1 - p.Die) * p.BCA2 * p.Mets2
 m.P.UC["Recur", "Dead"]  <- p.Die
 # From Mets
 m.P.UC["Mets", "Local"]  <- 0
@@ -196,7 +201,7 @@ To calculate life years, quality adjusted life years, and cost, we will specify 
 For the life years, for each year spent in any of the non-dead states, the cohort will get one year of life. That is, the elements of all the columns corresponding non-dead states equal to one.
 
 ```{r Rewards Matrix life years-UC}
-m.LY.UC <- matrix(rep(c(1, 1, 1, 0), (n.s-1)), 
+m.LY.UC <- matrix(rep(c(1, 1, 1, 0), (n.s - 1)), 
                   byrow = TRUE,
                   nrow = n.s, ncol = n.s, 
                   dimnames = list(state.names, state.names))
@@ -214,7 +219,7 @@ m.QALY.UC
 ```
 
 ```{r Rewards Matrix Costs-UC}
-m.C.UC <- matrix(rep(c(c.Local, c.Recur, c.Mets, 0), n.s),
+m.C.UC <- matrix(rep(c(c.Local, c.Recur, c.Mets, c.Dead), n.s),
                  byrow = TRUE,
                  nrow = n.s, ncol = n.s, 
                  dimnames = list(state.names, state.names))
@@ -243,7 +248,7 @@ To compute the expected costs, we follow the same procedure but now using the re
 ```{r Calculate Expected Value Costs}
 ev.C.UC <- ExpectedValue(trans = l.Markov.UC$trans, 
                          rwd = m.C.UC, 
-                         r = d.c, half = T)
+                         r = d.c, half = TRUE)
 ev.C.UC
 ```
 
@@ -254,7 +259,7 @@ The new treatment reduces the initial rate of cancer recurrence by 50% (i.e., a 
 
 ```{r Rx-Effect}
 hr.Recur   <- 0.5
-p.BCA1.Rx  <- 1-exp(log(1-p.BCA1)*hr.Recur)
+p.BCA1.Rx  <- 1 - exp(log(1 - p.BCA1) * hr.Recur)
 ```
 
 ## Transition matrix
@@ -281,7 +286,7 @@ m.P.Rx["Local", "Dead"]  <- p.Die
 # From Recur
 m.P.Rx["Recur", "Local"] <- 0
 m.P.Rx["Recur", "Recur"] <- (1 - p.Die) * ((1 - p.BCA2) + (p.BCA2 * (1 - p.Mets2)))
-m.P.Rx["Recur", "Mets"]  <- (1-p.Die)*p.BCA2*p.Mets2
+m.P.Rx["Recur", "Mets"]  <- (1 - p.Die) * p.BCA2 * p.Mets2
 m.P.Rx["Recur", "Dead"]  <- p.Die
 # From Mets
 m.P.Rx["Mets", "Local"]  <- 0
@@ -327,7 +332,7 @@ m.QALY.Rx
 ```
 
 ```{r Rewards Matrix Costs-Rx}
-m.C.Rx <- matrix(rep(c(c.Local + c.Rx, c.Recur, c.Mets, 0), n.s),
+m.C.Rx <- matrix(rep(c(c.Local + c.Rx, c.Recur, c.Mets, c.Dead), n.s),
                  byrow = TRUE,
                  nrow = n.s, ncol = n.s, 
                  dimnames = list(state.names, state.names))
@@ -339,7 +344,7 @@ m.C.Rx
 ```{r Calculate Expected Value Life Year-Rx}
 ev.LY.Rx <- ExpectedValue(trans = l.Markov.Rx$trans, 
                           rwd = m.LY.Rx, 
-                          r = d.e, half = T)
+                          r = d.e, half = TRUE)
 ev.LY.Rx
 ```
 
@@ -347,7 +352,7 @@ To compute the expected QALYs, we follow the same procedure but now using the re
 ```{r Calculate Expected Value QALY-Rx}
 ev.QALY.Rx <- ExpectedValue(trans = l.Markov.Rx$trans, 
                             rwd = m.QALY.Rx, 
-                            r = d.e, half = T)
+                            r = d.e, half = TRUE)
 ev.QALY.Rx
 ```
 
@@ -356,7 +361,7 @@ To compute the expected costs, we follow the same procedure but now using the re
 ```{r Calculate Expected Value Costs-Rx}
 ev.C.Rx <- ExpectedValue(trans = l.Markov.Rx$trans, 
                          rwd = m.C.Rx, 
-                         r = d.c, half = T)
+                         r = d.c, half = TRUE)
 ev.C.Rx
 ```
 
